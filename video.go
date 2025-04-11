@@ -5,10 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
-	"strings"
-	"time"
-
-	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/database"
 )
 
 type orientation string
@@ -78,21 +74,4 @@ func processVideoForFastStart(filePath string) (string, error) {
 	}
 
 	return outPath, nil
-}
-
-func (cfg *apiConfig) dbVideoToSignedVideo(video database.Video) (database.Video, error) {
-	if video.VideoURL == nil {
-		return video, nil
-	}
-	config := strings.Split(*video.VideoURL, ",")
-	if len(config) < 2 {
-		return video, nil
-	}
-	url, err := generatePresignedURL(cfg.s3Client, config[0], config[1], time.Minute*5)
-	if err != nil {
-		return video, err
-	}
-
-	video.VideoURL = &url
-	return video, nil
 }
