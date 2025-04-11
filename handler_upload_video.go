@@ -5,6 +5,7 @@ import (
 	"mime"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
@@ -82,12 +83,32 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	processedFilePath, err := processVideoForFastStart(tmpFile.Name())
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Unable to process file", err)
+		return
+	}
+
+	procFile, err := os.Open(processedFilePath)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Unable to open processed file", err)
+		return
+	}
+
 	key := getAssetPath(mediaType)
+
+	orientation, err := getVideoAspectRatio(tmpFile.Name())
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Unable to fetch aspect ratio", err)
+		return
+	}
+
+	key = filepath.Join(orientation, key)
 
 	_, err = cfg.s3Client.PutObject(r.Context(), &s3.PutObjectInput{
 		Bucket:      &cfg.s3Bucket,
 		Key:         &key,
-		Body:        tmpFile,
+		Body:        procFile,
 		ContentType: &mediaType,
 	})
 	if err != nil {
@@ -96,6 +117,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	}
 
 	vidURL := cfg.getObjectURL(key)
+
 	video.VideoURL = &vidURL
 
 	err = cfg.db.UpdateVideo(video)
